@@ -87,7 +87,12 @@ describe('anchor-escrow', () => {
 
     initializerTokenAccountB = await mintB.createAccount(initializerMainAccount.publicKey);
     takerTokenAccountB = await mintB.createAccount(takerMainAccount.publicKey);
-
+    //new
+    let _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
+    let _takerTokenAccountB = await mintB.getAccountInfo(takerTokenAccountB);
+    assert.ok(_initializerTokenAccountA.amount.toNumber() == 0);
+    assert.ok(_takerTokenAccountB.amount.toNumber() == 0);
+    //new
     await mintA.mintTo(
       initializerTokenAccountA,
       mintAuthority.publicKey,
@@ -102,9 +107,10 @@ describe('anchor-escrow', () => {
       takerAmount
     );
 
-    let _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
-    let _takerTokenAccountB = await mintB.getAccountInfo(takerTokenAccountB);
-
+    // let _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
+    // let _takerTokenAccountB = await mintB.getAccountInfo(takerTokenAccountB);
+    _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
+    _takerTokenAccountB = await mintB.getAccountInfo(takerTokenAccountB);
     assert.ok(_initializerTokenAccountA.amount.toNumber() == initializerAmount);
     assert.ok(_takerTokenAccountB.amount.toNumber() == takerAmount);
   });
@@ -122,6 +128,7 @@ describe('anchor-escrow', () => {
       program.programId
     );
     vault_authority_pda = _vault_authority_pda;
+
 
     await program.rpc.initialize(
       vault_account_bump,
@@ -151,6 +158,12 @@ describe('anchor-escrow', () => {
     let _escrowAccount = await program.account.escrowAccount.fetch(
       escrowAccount.publicKey
     );
+
+    //new
+    let _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
+    assert.ok(_initializerTokenAccountA.amount.toNumber() == 0);
+    assert.ok(_vault.amount.toNumber() == initializerAmount);
+    //new
 
     // Check that the new owner is the PDA.
     assert.ok(_vault.owner.equals(vault_authority_pda));
@@ -197,12 +210,17 @@ describe('anchor-escrow', () => {
 
   it("Initialize escrow and cancel escrow", async () => {
     // Put back tokens into initializer token A account.
+
+    let _initializerTokenAccountAA = await mintA.getAccountInfo(initializerTokenAccountA);
+    assert.ok(_initializerTokenAccountAA.amount.toNumber() == 0);
     await mintA.mintTo(
       initializerTokenAccountA,
       mintAuthority.publicKey,
       [mintAuthority],
       initializerAmount
     );
+    _initializerTokenAccountAA = await mintA.getAccountInfo(initializerTokenAccountA);
+    assert.ok(_initializerTokenAccountAA.amount.toNumber() == initializerAmount);
 
     await program.rpc.initialize(
       vault_account_bump,
@@ -226,8 +244,34 @@ describe('anchor-escrow', () => {
         signers: [escrowAccount, initializerMainAccount],
       }
     );
+    let _vault = await mintA.getAccountInfo(vault_account_pda);
+
+    let _escrowAccount = await program.account.escrowAccount.fetch(
+      escrowAccount.publicKey
+    );
+    //new
+    _initializerTokenAccountAA = await mintA.getAccountInfo(initializerTokenAccountA);
+    assert.ok(_initializerTokenAccountAA.amount.toNumber() == 0);
+    assert.ok(_vault.amount.toNumber() == initializerAmount);
+    //new
+
+    // Check that the new owner is the PDA.
+    assert.ok(_vault.owner.equals(vault_authority_pda));
+
+    // Check that the values in the escrow account match what we expect.
+    assert.ok(_escrowAccount.initializerKey.equals(initializerMainAccount.publicKey));
+    assert.ok(_escrowAccount.initializerAmount.toNumber() == initializerAmount);
+    assert.ok(_escrowAccount.takerAmount.toNumber() == takerAmount);
+    assert.ok(
+      _escrowAccount.initializerDepositTokenAccount.equals(initializerTokenAccountA)
+    );
+    assert.ok(
+      _escrowAccount.initializerReceiveTokenAccount.equals(initializerTokenAccountB)
+    );
 
     // Cancel the escrow.
+
+
     await program.rpc.cancel({
       accounts: {
         initializer: initializerMainAccount.publicKey,
@@ -246,5 +290,6 @@ describe('anchor-escrow', () => {
 
     // Check all the funds are still there.
     assert.ok(_initializerTokenAccountA.amount.toNumber() == initializerAmount);
+
   });
 });
